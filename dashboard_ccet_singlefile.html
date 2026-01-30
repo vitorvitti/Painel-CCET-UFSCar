@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Painel CCET (UFSCar) — Dashboard Interativo</title>
+
+  <!-- Libs via CDN (arquivo único de dashboard; depende de internet para carregar as libs) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b1020;
+      --card:#121a33;
+      --card2:#0f1730;
+      --text:#e8ecff;
+      --muted:#b9c2ff;
+      --border:rgba(255,255,255,.10);
+      --accent:#7aa2ff;
+      --warn:#ffcf5a;
+      --bad:#ff6b6b;
+      --good:#6bffb0;
+      --shadow: 0 10px 25px rgba(0,0,0,.35);
+      --radius: 14px;
+      --radius2: 18px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    body{
+      margin:0; font-family:var(--font); color:var(--text);
+      background: radial-gradient(1200px 800px at 15% 10%, rgba(122,162,255,.28), transparent 55%),
+                  radial-gradient(900px 600px at 85% 20%, rgba(107,255,176,.14), transparent 55%),
+                  radial-gradient(900px 700px at 50% 85%, rgba(255,207,90,.10), transparent 55%),
+                  var(--bg);
+    }
+    .wrap{max-width: 1200px; margin: 26px auto 60px; padding: 0 16px;}
+    header{
+      display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap;
+      margin-bottom: 16px;
+    }
+    h1{font-size: 22px; margin:0 0 6px 0; letter-spacing:.2px;}
+    .sub{color:var(--muted); font-size: 13px; line-height: 1.35; max-width: 820px;}
+    .pill{
+      border:1px solid var(--border); border-radius:999px; padding:6px 10px; color:var(--muted);
+      background: rgba(255,255,255,.04);
+      font-size: 12px;
+    }
+
+    .panel{
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--border);
+      border-radius: var(--radius2);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      margin: 12px 0;
+    }
+
+    .row{display:grid; grid-template-columns: 1fr; gap: 12px;}
+    @media(min-width: 980px){ .row.cols2{grid-template-columns: 1.25fr .75fr;} }
+    @media(min-width: 980px){ .row.cols3{grid-template-columns: 1fr 1fr 1fr;} }
+    @media(min-width: 980px){ .row.kpis{grid-template-columns: repeat(4, 1fr);} }
+    @media(min-width: 980px){ .row.kpis2{grid-template-columns: repeat(3, 1fr);} }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.03));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 12px;
+      box-shadow: 0 10px 20px rgba(0,0,0,.20);
+      min-height: 78px;
+    }
+    .kpi-title{font-size:12px; color: var(--muted); margin-bottom: 6px;}
+    .kpi-val{font-size: 26px; font-weight: 700; letter-spacing: .2px;}
+    .kpi-sub{font-size: 12px; color: var(--muted); margin-top: 2px;}
+
+    .filters{
+      display:grid; gap: 10px;
+      grid-template-columns: 1fr;
+    }
+    @media(min-width: 980px){
+      .filters{grid-template-columns: 1.5fr 1fr 1fr 1fr;}
+    }
+    label{font-size: 12px; color: var(--muted); display:block; margin-bottom: 6px;}
+    select, input[type="number"]{
+      width: 100%;
+      background: rgba(255,255,255,.05);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      outline: none;
+      font-size: 13px;
+    }
+    select[multiple]{height: 104px;}
+    .minirow{display:grid; grid-template-columns: 1fr 1fr; gap: 8px;}
+    .btnbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top: 8px;}
+    button{
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 9px 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover{background: rgba(255,255,255,.10);}
+    .note{font-size: 12px; color: var(--muted); line-height:1.35;}
+    .ok{color: var(--good);}
+    .bad{color: var(--bad);}
+    .chart{
+      background: rgba(255,255,255,.03);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px;
+      min-height: 320px;
+    }
+    .chart-title{font-size: 13px; color: var(--muted); margin: 0 0 8px 2px;}
+    .hr{height:1px; background: var(--border); margin: 10px 0;}
+    .footer{color: var(--muted); font-size: 12px; margin-top: 16px;}
+    .hidden{display:none !important;}
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Painel CCET (UFSCar) — Dashboard interativo (1 arquivo)</h1>
+      <div class="sub">
+        1) Clique em <b>Carregar planilha</b> e selecione o Excel (<i>Discentes_CCET – desde 2000</i>).<br/>
+        2) O painel cria indicadores e gráficos automaticamente (Ingresso, Status, Evasão, Conclusão, Prazo).<br/>
+        3) Use filtros para atualizar tudo em tempo real (curso, campus, turno, matriz, coorte/ano, modalidade SISU, situação).
+      </div>
+    </div>
+    <div class="pill">Versão piloto — replicável por curso</div>
+  </header>
+
+  <section class="panel">
+    <div class="btnbar">
+      <input id="fileInput" type="file" accept=".xlsx,.xls" />
+      <button id="btnLoad">Carregar planilha</button>
+      <button id="btnReset" disabled>Limpar filtros</button>
+      <span id="loadStatus" class="note"></span>
+    </div>
+    <div class="hr"></div>
+
+    <div class="filters" id="filtersBlock" aria-live="polite">
+      <div>
+        <label>Curso (multi-seleção)</label>
+        <select id="fCurso" multiple></select>
+      </div>
+      <div>
+        <label>Campus</label>
+        <select id="fCampus"></select>
+      </div>
+      <div>
+        <label>Turno</label>
+        <select id="fTurno"></select>
+      </div>
+      <div>
+        <label>Coorte (ano de ingresso)</label>
+        <div class="minirow">
+          <input id="fAnoMin" type="number" placeholder="de" />
+          <input id="fAnoMax" type="number" placeholder="até" />
+        </div>
+        <div class="note" style="margin-top:6px;">Dica: use intervalo (ex.: 2015 a 2020) para comparar antes/depois de mudança de matriz.</div>
+      </div>
+
+      <div>
+        <label>Matriz Curricular</label>
+        <select id="fMatriz"></select>
+      </div>
+      <div>
+        <label>Modalidade SISU</label>
+        <select id="fModSisu"></select>
+      </div>
+      <div>
+        <label>Situação (simplificada)</label>
+        <select id="fSituacao"></select>
+      </div>
+      <div>
+        <label>Centro</label>
+        <select id="fCentro"></select>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="row kpis" id="kpisRow1">
+      <div class="card"><div class="kpi-title">Ingressantes (no recorte)</div><div class="kpi-val" id="kIngressantes">—</div><div class="kpi-sub" id="kIngressantesSub"></div></div>
+      <div class="card"><div class="kpi-title">Ativos</div><div class="kpi-val" id="kAtivos">—</div><div class="kpi-sub">Situação = Ativo</div></div>
+      <div class="card"><div class="kpi-title">Concluídos</div><div class="kpi-val" id="kConcluidos">—</div><div class="kpi-sub">Situação = Concluído</div></div>
+      <div class="card"><div class="kpi-title">Evadidos</div><div class="kpi-val" id="kEvadidos">—</div><div class="kpi-sub">Situação = Evadido</div></div>
+    </div>
+
+    <div class="row kpis2" style="margin-top:12px;">
+      <div class="card"><div class="kpi-title">Taxa de evasão</div><div class="kpi-val" id="kTxEvasao">—</div><div class="kpi-sub">Evadidos / Total</div></div>
+      <div class="card"><div class="kpi-title">Taxa de conclusão</div><div class="kpi-val" id="kTxConclusao">—</div><div class="kpi-sub">Concluídos / Total</div></div>
+      <div class="card"><div class="kpi-title">Conclusão no prazo (concluídos)</div><div class="kpi-val" id="kNoPrazo">—</div><div class="kpi-sub">Dentro do prazo médio da matriz</div></div>
+    </div>
+  </section>
+
+  <section class="row cols2">
+    <div class="panel">
+      <div class="chart-title">Ingresso — ingressantes por coorte (ano de ingresso)</div>
+      <div id="chIngressantesAno" class="chart"></div>
+    </div>
+    <div class="panel">
+      <div class="chart-title">Status — distribuição (situação simplificada)</div>
+      <div id="chStatusPie" class="chart"></div>
+    </div>
+  </section>
+
+  <section class="row cols2">
+    <div class="panel">
+      <div class="chart-title">Evasão & conclusão por coorte (volume + taxa)</div>
+      <div id="chCohortEvasaoConclusao" class="chart"></div>
+    </div>
+    <div class="panel">
+      <div class="chart-title">Conclusão — concluintes por ano de egresso</div>
+      <div id="chConcluintesAno" class="chart"></div>
+    </div>
+  </section>
+
+  <section class="row cols2">
+    <div class="panel">
+      <div class="chart-title">Ingresso — modalidade SISU (no recorte)</div>
+      <div id="chModalidadeSisu" class="chart"></div>
+    </div>
+    <div class="panel">
+      <div class="chart-title">Evasão — em que “ano de curso” ocorre mais</div>
+      <div id="chEvasaoAnoCurso" class="chart"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="note">
+      <b>Notas rápidas sobre o modelo</b><br/>
+      • O painel cria a “Situação simplificada” automaticamente a partir de <i>Status</i> e/ou <i>Ano Egresso</i> (com regras heurísticas).<br/>
+      • Se seu arquivo tiver nomes ligeiramente diferentes nas colunas, você pode ajustar o mapeamento no código (bloco <i>COLS</i>).<br/>
+      • Para adicionar “Ocupação de vagas” (vagas ofertadas x ingressantes), será preciso uma tabela extra com vagas por curso/ano.
+    </div>
+  </section>
+
+  <div class="footer">
+    Arquivo único (HTML). Para publicar em site: basta colocar este arquivo em um servidor (ou Google Sites via embed/iframe em hospedagem) e apontar o link.
+  </div>
+
+</div>
+
+<script>
+/* =========================
+   Config: nomes de colunas
+   ========================= */
+const COLS = {
+  matricula: "Matricula",
+  inicioVinculo: "Início Vínculo",
+  campus: "Campus",
+  curso: "Curso",
+  siglaCurso: "Sigla do Curso",
+  centro: "centro",
+  turno: "turno",
+  matriz: "Matriz Curricular",
+  prazoMedio: "Prazo Médio",
+  duracao: "duracao",
+  ingressoAno: "Ingresso-Ano",
+  ingressoPeriodo: "Ingresso-Período",
+  status: "Status",
+  anoEgresso: "Ano Egresso",
+  periodoEgresso: "Período Egresso",
+  modSisu: "Modalidade SISU",
+  modSisuDesc: "Descrição Modalidade SISU",
+};
+
+/* =========================
+   Estado
+   ========================= */
+let RAW = [];      // linhas normalizadas
+let FILTERED = []; // linhas filtradas
+let LOADED = false;
+
+/* =========================
+   Helpers
+   ========================= */
+function normStr(v){
+  if (v === undefined || v === null) return "";
+  const s = String(v).trim();
+  if (s.toLowerCase() === "(null)" || s.toLowerCase() === "null") return "";
+  return s;
+}
+function toNum(v){
+  if (v === undefined || v === null) return NaN;
+  if (typeof v === "number") return v;
+  const s = String(v).replace(",", ".").trim();
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+function uniqSorted(arr){
+  const s = Array.from(new Set(arr.filter(x => x!=="" && x!==null && x!==undefined)));
+  s.sort((a,b)=> String(a).localeCompare(String(b), "pt-BR", {numeric:true}));
+  return s;
+}
+function pct(n,d){
+  if (!d) return 0;
+  return (n/d)*100;
+}
+function fmtInt(n){
+  if (!Number.isFinite(n)) return "—";
+  return n.toLocaleString("pt-BR");
+}
+function fmtPct(n){
+  if (!Number.isFinite(n)) return "—";
+  return n.toFixed(1).replace(".", ",") + "%";
+}
+
+/* =========================
+   Derivações (regras simples)
+   ========================= */
+function deriveSituacao(statusRaw, anoEgressoRaw){
+  const anoE = normStr(anoEgressoRaw);
+  if (anoE !== "") return "Concluído";
+
+  const st = normStr(statusRaw).toLowerCase();
+  if (st.includes("tranc")) return "Trancado";
+
+  const evTokens = ["evad", "deslig", "cancel", "aband", "jubil", "desvinc", "exclu", "desist"];
+  for (const t of evTokens){
+    if (st.includes(t)) return "Evadido";
+  }
+  // fallback
+  return "Ativo";
+}
+
+function deriveAnoCurso(duracaoRaw){
+  // assume duracao ~ semestres; converte para anos (ceil/2)
+  const d = toNum(duracaoRaw);
+  if (!Number.isFinite(d)) return NaN;
+  return Math.max(1, Math.ceil(d/2));
+}
+
+function isDentroPrazo(situacao, duracaoRaw, prazoRaw){
+  if (situacao !== "Concluído") return 0;
+  const d = toNum(duracaoRaw);
+  const p = toNum(prazoRaw);
+  if (!Number.isFinite(d) || !Number.isFinite(p)) return 0;
+  return (d <= p) ? 1 : 0;
+}
+
+/* =========================
+   Carregar Excel
+   ========================= */
+async function loadExcelFromFile(file){
+  const ab = await file.arrayBuffer();
+  const wb = XLSX.read(ab, {type:"array"});
+  const sheetName = wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const json = XLSX.utils.sheet_to_json(ws, {defval: ""});
+
+  // normalizar / manter só colunas que usamos
+  RAW = json.map(r => {
+    const matricula = normStr(r[COLS.matricula]);
+    const curso = normStr(r[COLS.curso]);
+    const campus = normStr(r[COLS.campus]);
+    const centro = normStr(r[COLS.centro]);
+    const turno = normStr(r[COLS.turno]);
+    const matriz = normStr(r[COLS.matriz]);
+
+    const ingressoAno = toNum(r[COLS.ingressoAno]);
+    const ingressoPeriodo = normStr(r[COLS.ingressoPeriodo]);
+
+    const status = normStr(r[COLS.status]);
+    const anoEgresso = normStr(r[COLS.anoEgresso]);
+
+    const modSisu = normStr(r[COLS.modSisu]) || normStr(r[COLS.modSisuDesc]);
+    const prazoMedio = toNum(r[COLS.prazoMedio]);
+    const duracao = toNum(r[COLS.duracao]);
+
+    const situacao = deriveSituacao(status, anoEgresso);
+    const anoCurso = deriveAnoCurso(duracao);
+    const dentroPrazo = isDentroPrazo(situacao, duracao, prazoMedio);
+
+    return {
+      matricula, curso, campus, centro, turno, matriz,
+      ingressoAno: Number.isFinite(ingressoAno) ? ingressoAno : NaN,
+      ingressoPeriodo,
+      status,
+      anoEgresso: anoEgresso,
+      modSisu,
+      prazoMedio,
+      duracao,
+      situacao,
+      anoCurso,
+      dentroPrazo,
+      flagAtivo: situacao==="Ativo" ? 1 : 0,
+      flagConcluido: situacao==="Concluído" ? 1 : 0,
+      flagEvadido: situacao==="Evadido" ? 1 : 0,
+      flagTrancado: situacao==="Trancado" ? 1 : 0,
+    };
+  }).filter(r => r.matricula !== "" || r.curso !== "");
+
+  LOADED = true;
+  document.getElementById("btnReset").disabled = false;
+  document.getElementById("loadStatus").innerHTML = `<span class="ok">Planilha carregada:</span> ${RAW.length.toLocaleString("pt-BR")} registros.`;
+
+  buildFilterOptions();
+  applyAndRender();
+}
+
+/* =========================
+   Filtros
+   ========================= */
+function setSelectOptions(sel, values, includeAll=true){
+  sel.innerHTML = "";
+  if (includeAll){
+    const opt = document.createElement("option");
+    opt.value = "__ALL__";
+    opt.textContent = "Todos";
+    sel.appendChild(opt);
+  }
+  for (const v of values){
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v;
+    sel.appendChild(opt);
+  }
+  // default
+  if (includeAll) sel.value = "__ALL__";
+}
+
+function getMultiSelected(sel){
+  return Array.from(sel.selectedOptions).map(o => o.value).filter(v => v !== "__ALL__");
+}
+
+function buildFilterOptions(){
+  const cursos = uniqSorted(RAW.map(r => r.curso));
+  const campus = uniqSorted(RAW.map(r => r.campus));
+  const turnos = uniqSorted(RAW.map(r => r.turno));
+  const matrizes = uniqSorted(RAW.map(r => r.matriz));
+  const mods = uniqSorted(RAW.map(r => r.modSisu));
+  const centros = uniqSorted(RAW.map(r => r.centro));
+  const situacoes = ["Ativo","Concluído","Evadido","Trancado"];
+
+  // curso multi
+  const fCurso = document.getElementById("fCurso");
+  fCurso.innerHTML = "";
+  for (const c of cursos){
+    const opt = document.createElement("option");
+    opt.value = c; opt.textContent = c;
+    fCurso.appendChild(opt);
+  }
+
+  setSelectOptions(document.getElementById("fCampus"), campus, true);
+  setSelectOptions(document.getElementById("fTurno"), turnos, true);
+  setSelectOptions(document.getElementById("fMatriz"), matrizes, true);
+  setSelectOptions(document.getElementById("fModSisu"), mods, true);
+  setSelectOptions(document.getElementById("fCentro"), centros, true);
+  setSelectOptions(document.getElementById("fSituacao"), situacoes, true);
+
+  // year range defaults
+  const years = RAW.map(r => r.ingressoAno).filter(y => Number.isFinite(y));
+  const minY = years.length ? Math.min(...years) : 2000;
+  const maxY = years.length ? Math.max(...years) : 2025;
+  document.getElementById("fAnoMin").value = minY;
+  document.getElementById("fAnoMax").value = maxY;
+
+  // listeners
+  const ids = ["fCampus","fTurno","fMatriz","fModSisu","fCentro","fSituacao","fAnoMin","fAnoMax","fCurso"];
+  ids.forEach(id => document.getElementById(id).addEventListener("change", applyAndRender));
+  document.getElementById("fAnoMin").addEventListener("input", debounce(applyAndRender, 250));
+  document.getElementById("fAnoMax").addEventListener("input", debounce(applyAndRender, 250));
+}
+
+function resetFilters(){
+  if (!LOADED) return;
+  document.getElementById("fCampus").value="__ALL__";
+  document.getElementById("fTurno").value="__ALL__";
+  document.getElementById("fMatriz").value="__ALL__";
+  document.getElementById("fModSisu").value="__ALL__";
+  document.getElementById("fCentro").value="__ALL__";
+  document.getElementById("fSituacao").value="__ALL__";
+
+  // clear course multi
+  const fCurso = document.getElementById("fCurso");
+  Array.from(fCurso.options).forEach(o => o.selected = false);
+
+  const years = RAW.map(r => r.ingressoAno).filter(y => Number.isFinite(y));
+  const minY = years.length ? Math.min(...years) : 2000;
+  const maxY = years.length ? Math.max(...years) : 2025;
+  document.getElementById("fAnoMin").value = minY;
+  document.getElementById("fAnoMax").value = maxY;
+
+  applyAndRender();
+}
+
+function applyFilters(){
+  if (!LOADED) return [];
+
+  const cursosSel = getMultiSelected(document.getElementById("fCurso"));
+  const campus = document.getElementById("fCampus").value;
+  const turno = document.getElementById("fTurno").value;
+  const matriz = document.getElementById("fMatriz").value;
+  const modSisu = document.getElementById("fModSisu").value;
+  const centro = document.getElementById("fCentro").value;
+  const situacao = document.getElementById("fSituacao").value;
+
+  const anoMin = toNum(document.getElementById("fAnoMin").value);
+  const anoMax = toNum(document.getElementById("fAnoMax").value);
+
+  return RAW.filter(r => {
+    if (cursosSel.length && !cursosSel.includes(r.curso)) return false;
+    if (campus !== "__ALL__" && r.campus !== campus) return false;
+    if (turno !== "__ALL__" && r.turno !== turno) return false;
+    if (matriz !== "__ALL__" && r.matriz !== matriz) return false;
+    if (modSisu !== "__ALL__" && r.modSisu !== modSisu) return false;
+    if (centro !== "__ALL__" && r.centro !== centro) return false;
+    if (situacao !== "__ALL__" && r.situacao !== situacao) return false;
+
+    if (Number.isFinite(anoMin) && Number.isFinite(r.ingressoAno) && r.ingressoAno < anoMin) return false;
+    if (Number.isFinite(anoMax) && Number.isFinite(r.ingressoAno) && r.ingressoAno > anoMax) return false;
+
+    return true;
+  });
+}
+
+/* =========================
+   Agregações
+   ========================= */
+function distinctCountMatricula(rows){
+  const s = new Set();
+  for (const r of rows){
+    if (r.matricula) s.add(r.matricula);
+  }
+  return s.size;
+}
+
+function groupCount(rows, keyFn){
+  const m = new Map();
+  for (const r of rows){
+    const k = keyFn(r);
+    if (!k) continue;
+    m.set(k, (m.get(k)||0)+1);
+  }
+  return m;
+}
+
+function groupSum(rows, keyFn, valFn){
+  const m = new Map();
+  for (const r of rows){
+    const k = keyFn(r);
+    if (!k) continue;
+    const v = valFn(r);
+    m.set(k, (m.get(k)||0) + (Number.isFinite(v)?v:0));
+  }
+  return m;
+}
+
+/* =========================
+   Render
+   ========================= */
+function applyAndRender(){
+  if (!LOADED) return;
+  FILTERED = applyFilters();
+  renderKPIs(FILTERED);
+  renderCharts(FILTERED);
+}
+
+function renderKPIs(rows){
+  const total = distinctCountMatricula(rows);
+  const ativos = rows.reduce((a,r)=>a+r.flagAtivo,0);
+  const concl = rows.reduce((a,r)=>a+r.flagConcluido,0);
+  const evad = rows.reduce((a,r)=>a+r.flagEvadido,0);
+  const tranc = rows.reduce((a,r)=>a+r.flagTrancado,0);
+
+  const txE = pct(evad, total);
+  const txC = pct(concl, total);
+
+  const conclRows = rows.filter(r=>r.flagConcluido===1);
+  const conclTotal = conclRows.length;
+  const noPrazo = conclRows.reduce((a,r)=>a+r.dentroPrazo,0);
+  const noPrazoPct = conclTotal ? pct(noPrazo, conclTotal) : 0;
+
+  document.getElementById("kIngressantes").textContent = fmtInt(total);
+  document.getElementById("kIngressantesSub").textContent = "Alunos no recorte atual (após filtros)";
+
+  document.getElementById("kAtivos").textContent = fmtInt(ativos);
+  document.getElementById("kConcluidos").textContent = fmtInt(concl);
+  document.getElementById("kEvadidos").textContent = fmtInt(evad);
+
+  document.getElementById("kTxEvasao").textContent = fmtPct(txE);
+  document.getElementById("kTxConclusao").textContent = fmtPct(txC);
+  document.getElementById("kNoPrazo").textContent = fmtPct(noPrazoPct);
+}
+
+function renderCharts(rows){
+  // 1) Ingressantes por coorte (ano ingresso)
+  const byYear = groupCount(rows, r => Number.isFinite(r.ingressoAno) ? String(r.ingressoAno) : "");
+  const years = Array.from(byYear.keys()).sort((a,b)=>Number(a)-Number(b));
+  const vals = years.map(y => byYear.get(y));
+
+  Plotly.newPlot("chIngressantesAno", [{
+      x: years, y: vals, type: "bar",
+      hovertemplate: "Coorte %{x}<br>Ingressantes %{y}<extra></extra>"
+    }], baseLayout("Ingressantes por ano de ingresso"), {displayModeBar:false});
+
+  // 2) Status Pie
+  const bySit = groupCount(rows, r => r.situacao);
+  const sitKeys = ["Ativo","Concluído","Evadido","Trancado"].filter(k => bySit.has(k));
+  const sitVals = sitKeys.map(k => bySit.get(k));
+
+  Plotly.newPlot("chStatusPie", [{
+      labels: sitKeys, values: sitVals, type: "pie", hole: .55,
+      hovertemplate: "%{label}<br>%{value} alunos<extra></extra>"
+    }], baseLayout("Distribuição por situação"), {displayModeBar:false});
+
+  // 3) Coorte — Evadidos & Concluídos + taxas
+  const coY = years; // reuse sorted years
+  const byEvadYear = new Map();
+  const byConclYear = new Map();
+  const byTotalYear = new Map();
+  for (const r of rows){
+    if (!Number.isFinite(r.ingressoAno)) continue;
+    const y = String(r.ingressoAno);
+    byTotalYear.set(y, (byTotalYear.get(y)||0) + 1);
+    if (r.flagEvadido) byEvadYear.set(y, (byEvadYear.get(y)||0)+1);
+    if (r.flagConcluido) byConclYear.set(y, (byConclYear.get(y)||0)+1);
+  }
+  const evVals = coY.map(y => byEvadYear.get(y)||0);
+  const conVals = coY.map(y => byConclYear.get(y)||0);
+  const txE = coY.map(y => pct(byEvadYear.get(y)||0, byTotalYear.get(y)||0));
+  const txC = coY.map(y => pct(byConclYear.get(y)||0, byTotalYear.get(y)||0));
+
+  Plotly.newPlot("chCohortEvasaoConclusao", [
+    {x: coY, y: evVals, type:"bar", name:"Evadidos", hovertemplate:"Coorte %{x}<br>Evadidos %{y}<extra></extra>"},
+    {x: coY, y: conVals, type:"bar", name:"Concluídos", hovertemplate:"Coorte %{x}<br>Concluídos %{y}<extra></extra>"},
+    {x: coY, y: txE, type:"scatter", mode:"lines+markers", name:"Taxa evasão (%)", yaxis:"y2",
+     hovertemplate:"Coorte %{x}<br>Tx evasão %{y:.1f}%<extra></extra>"},
+    {x: coY, y: txC, type:"scatter", mode:"lines+markers", name:"Taxa conclusão (%)", yaxis:"y2",
+     hovertemplate:"Coorte %{x}<br>Tx conclusão %{y:.1f}%<extra></extra>"},
+  ], {
+    ...baseLayout("Volume e taxa por coorte"),
+    barmode:"group",
+    yaxis2: {
+      overlaying: "y",
+      side: "right",
+      tickformat: ",.0f",
+      rangemode: "tozero",
+      title: {text:"%"},
+      showgrid:false
+    }
+  }, {displayModeBar:false});
+
+  // 4) Concluintes por ano de egresso
+  const byAnoE = groupCount(rows, r => normStr(r.anoEgresso));
+  const egYears = Array.from(byAnoE.keys()).filter(k=>k!=="").sort((a,b)=>Number(a)-Number(b));
+  const egVals = egYears.map(y => byAnoE.get(y));
+
+  Plotly.newPlot("chConcluintesAno", [{
+    x: egYears, y: egVals, type:"bar",
+    hovertemplate:"Ano egresso %{x}<br>Concluintes %{y}<extra></extra>"
+  }], baseLayout("Concluintes por ano de egresso"), {displayModeBar:false});
+
+  // 5) Modalidade SISU
+  const byMod = groupCount(rows, r => r.modSisu);
+  const modKeys = Array.from(byMod.keys()).filter(k=>k!=="").sort((a,b)=>byMod.get(b)-byMod.get(a)).slice(0, 12);
+  const modVals = modKeys.map(k=>byMod.get(k));
+
+  Plotly.newPlot("chModalidadeSisu", [{
+    x: modKeys, y: modVals, type:"bar",
+    hovertemplate:"%{x}<br>Ingressantes %{y}<extra></extra>"
+  }], {
+    ...baseLayout("Modalidade SISU (Top 12)"),
+    xaxis: {...baseLayout().xaxis, tickangle: -35}
+  }, {displayModeBar:false});
+
+  // 6) Evasão por AnoCurso (a partir de duração)
+  const evRows = rows.filter(r=>r.flagEvadido===1 && Number.isFinite(r.anoCurso));
+  const byAnoCurso = groupCount(evRows, r => String(r.anoCurso));
+  const acKeys = Array.from(byAnoCurso.keys()).sort((a,b)=>Number(a)-Number(b));
+  const acVals = acKeys.map(k=>byAnoCurso.get(k));
+
+  Plotly.newPlot("chEvasaoAnoCurso", [{
+    x: acKeys, y: acVals, type:"bar",
+    hovertemplate:"Ano do curso %{x}<br>Evadidos %{y}<extra></extra>"
+  }], baseLayout("Evasão por “ano de curso”"), {displayModeBar:false});
+}
+
+function baseLayout(title){
+  return {
+    title: {text: title || "", font:{size:14, color:"#b9c2ff"}},
+    paper_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: "rgba(0,0,0,0)",
+    margin: {l:42, r:32, t:42, b:40},
+    font: {color:"#e8ecff"},
+    xaxis: {gridcolor:"rgba(255,255,255,.08)", zerolinecolor:"rgba(255,255,255,.08)"},
+    yaxis: {gridcolor:"rgba(255,255,255,.08)", zerolinecolor:"rgba(255,255,255,.08)", rangemode:"tozero"},
+    legend: {orientation:"h", y: -0.18},
+  };
+}
+
+function debounce(fn, ms){
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(()=>fn(...args), ms);
+  };
+}
+
+/* =========================
+   Wire UI
+   ========================= */
+document.getElementById("btnLoad").addEventListener("click", async () => {
+  const file = document.getElementById("fileInput").files?.[0];
+  if (!file){
+    document.getElementById("loadStatus").innerHTML = `<span class="bad">Selecione um arquivo .xlsx primeiro.</span>`;
+    return;
+  }
+  document.getElementById("loadStatus").textContent = "Carregando e processando…";
+  try{
+    await loadExcelFromFile(file);
+  }catch(err){
+    console.error(err);
+    document.getElementById("loadStatus").innerHTML = `<span class="bad">Erro ao ler a planilha.</span> Verifique se é um .xlsx e se a primeira aba contém os dados.`;
+  }
+});
+
+document.getElementById("btnReset").addEventListener("click", resetFilters);
+</script>
+</body>
+</html>
