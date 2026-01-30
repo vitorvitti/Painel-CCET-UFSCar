@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Painéis CCET – UFSCar</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      line-height: 1.6;
+    }
+    h1 { color: #0d6efd; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 10px; }
+    a { text-decoration: none; color: #0d6efd; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<h1>Painéis de Graduação – CCET/UFSCar</h1>
+<p>
+Repositório com diferentes modelos de dashboards para análise de dados
+acadêmicos (ingresso, evasão, permanência e conclusão).
+</p>
+
+<h2>Dashboards disponíveis</h2>
+<ul>
+  <li><a href="index.html">Dashboard CCET – Bom</a></li>
+  <li><a href="dashboard_ccet_ufscar.html">Dashboard CCET – Base</a></li>
+  <li><a href="dashboard_ccet_moderno.html">Dashboard CCET – Estilo Moderno</a></li>
+  <li><a href="dashboard_ccet_ufscar_v2_ecograd_style.html">Dashboard CCET – Estilo EcoGrad</a></li>
+  <li><a href="dashboard_ccet_ufscar_v3_completo.html">Dashboard CCET – Completo e Robusto</a></li>
+  <li><a href="dashboard_ccet_singlefile.html">Dashboard CCET – Single File</a></li>
+</ul>
+
+<p><strong>Fonte:</strong> Base interna CCET/UFSCar (discentes desde 2000)</p>
+
+</body>
+</html>
